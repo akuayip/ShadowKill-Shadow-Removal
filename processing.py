@@ -2,37 +2,36 @@ import cv2
 import numpy as np
 
 def shadow_removal(image):
-    """
-    Melakukan shadow removal konvensional pada citra dokumen.
-    """
-
-    # Resize agar seragam
+    # 1. Resize (Tetap sama)
     image = cv2.resize(image, (600, 800))
-
-    # Grayscale
+    
+    # 2. Grayscale
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-
-    # Blur
-    blur = cv2.GaussianBlur(gray, (5, 5), 0)
-
-    # Estimate background menggunakan morphological closing
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (25, 25))
-    background = cv2.morphologyEx(blur, cv2.MORPH_CLOSE, kernel)
-
+    
+    # 3. Estimasi Background (Ditingkatkan)
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (51, 51)) 
+    
+    # Gunakan MORPH_CLOSE (Dilation -> Erosion) untuk menutup tulisan hitam
+    background = cv2.morphologyEx(gray, cv2.MORPH_CLOSE, kernel)
+    
+    # Hindari pembagian dengan nol (safety measure)
     background = np.where(background == 0, 1, background)
-
-    # Illumination correction
+    
+    # 4. Illumination Correction
     corrected = cv2.divide(gray, background, scale=255)
-    corrected_uint8 = (corrected * 255).astype(np.uint8)
+        
+    # 5. Post-Processing (Opsional: Sharpening)
+    sharpen_kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
+    corrected = cv2.filter2D(corrected, -1, sharpen_kernel)
 
-    # Adaptive thresholding
-    result = cv2.adaptiveThreshold(
-        corrected_uint8,
+    # 6. Binarization 
+    binary_result = cv2.adaptiveThreshold(
+        corrected,
         255,
         cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
         cv2.THRESH_BINARY,
-        35,
-        10
+        25, 
+        15  
     )
 
-    return image, corrected_uint8, result
+    return image, corrected, binary_result
