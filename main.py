@@ -187,7 +187,9 @@ class ShadowKillApp(QWidget):
     # LOAD SHADOW IMAGE
     # =================================================================
     def load_shadow(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Select Image", "", "Images (*.png *.jpg)")
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Select Image", "", "Images (*.png *.jpg *.jpeg *.JPG *.JPEG *.PNG)"
+        )
         if path:
             self.original = cv2.imread(path)
             self.label_original.setPixmap(cv_to_pixmap(self.original))
@@ -195,7 +197,9 @@ class ShadowKillApp(QWidget):
 
     # LOAD GROUND TRUTH
     def load_ground_truth(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Select Ground Truth", "", "Images (*.png *.jpg)")
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Select Ground Truth", "", "Images (*.png *.jpg *.jpeg *.JPG *.JPEG *.PNG)"
+        )
         if path:
             self.ground_truth = cv2.imread(path)
             self.label_gt.setPixmap(cv_to_pixmap(self.ground_truth))
