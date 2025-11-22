@@ -20,7 +20,7 @@ def shadow_removal(image):
     # 4. Illumination Correction
     corrected = cv2.divide(gray, background, scale=255)
         
-    # 5. Post-Processing (Opsional: Sharpening)
+    # 5. Post-Processing
     sharpen_kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
     corrected = cv2.filter2D(corrected, -1, sharpen_kernel)
 
