@@ -9,12 +9,8 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtGui import QPixmap, QImage
 from PyQt6.QtCore import Qt
 
-# ==========================================
-# IMPORT MODEL
-# ==========================================
-# Ganti 'bedsr_model' dengan nama file .py tempat BEDSRNet berada
-from bedsrmodel import BEDSRNet
 
+from bedsrmodel import BEDSRNet
 
 # ==========================================
 # Helper: numpy RGB -> QPixmap

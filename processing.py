@@ -2,36 +2,52 @@ import cv2
 import numpy as np
 
 def shadow_removal(image):
-    # 1. Resize (Tetap sama)
-    image = cv2.resize(image, (600, 800))
+    # 1. Simpan resolusi asli & Denoising awal
+    denoised = cv2.medianBlur(image, 3)
     
-    # 2. Grayscale
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    # 2. Proses di ruang warna HSV untuk mempertahankan warna
+    hsv = cv2.cvtColor(denoised, cv2.COLOR_BGR2HSV)
+    h, s, v = cv2.split(hsv)
     
-    # 3. Estimasi Background (Ditingkatkan)
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (51, 51)) 
+    # 3. Estimasi Background Dinamis
+    h_img, w_img = v.shape
+    kernel_size = int(min(h_img, w_img) * 0.03) 
+    if kernel_size % 2 == 0:
+        kernel_size += 1
+    # Minimal kernel size 15 agar tidak terlalu kecil
+    kernel_size = max(15, kernel_size)
     
-    # Gunakan MORPH_CLOSE (Dilation -> Erosion) untuk menutup tulisan hitam
-    background = cv2.morphologyEx(gray, cv2.MORPH_CLOSE, kernel)
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (kernel_size, kernel_size))
     
-    # Hindari pembagian dengan nol (safety measure)
-    background = np.where(background == 0, 1, background)
+    # Morphological Close untuk mendapatkan estimasi background
+    background = cv2.morphologyEx(v, cv2.MORPH_CLOSE, kernel)
     
-    # 4. Illumination Correction
-    corrected = cv2.divide(gray, background, scale=255)
-        
-    # 5. Post-Processing
-    sharpen_kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
-    corrected = cv2.filter2D(corrected, -1, sharpen_kernel)
-
-    # 6. Binarization 
+    # Safety measure: hindari pembagian dengan nol
+    background = np.where(background == 0, 1, background).astype(np.float32)
+    v_float = v.astype(np.float32)
+    
+    # 4. Illumination Correction (Division)
+    corrected_v = (v_float / background) * 255
+    corrected_v = np.clip(corrected_v, 0, 255).astype(np.uint8)
+    
+    # 5. Contrast Enhancement (CLAHE)
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    enhanced_v = clahe.apply(corrected_v)
+    
+    # 6. Gabungkan kembali ke citra berwarna
+    merged_hsv = cv2.merge([h, s, enhanced_v])
+    result_color = cv2.cvtColor(merged_hsv, cv2.COLOR_HSV2BGR)
+    
+    corrected_gray = enhanced_v
+    
+    # 7. Binarization (Opsional, untuk output hitam putih tegas)
     binary_result = cv2.adaptiveThreshold(
-        corrected,
+        enhanced_v,
         255,
         cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
         cv2.THRESH_BINARY,
-        25, 
-        15  
+        21, # Block size
+        10  # C
     )
 
-    return image, corrected, binary_result
+    return image, corrected_gray, result_color
