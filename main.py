@@ -16,8 +16,11 @@ from utils import cv_to_pixmap, save_image, ensure_result_folder
 class ShadowKillApp(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("ShadowKill – Shadow Removal (Conventional)")
-        self.setGeometry(200, 100, 1400, 850)
+        self.setWindowTitle("ShadowKill – Ultimate Shadow Removal")
+        self.setGeometry(100, 100, 1400, 900)
+        
+        # Set Application Font
+        self.setFont(QFont("Segoe UI", 10))
 
         ensure_result_folder()
 
@@ -26,165 +29,205 @@ class ShadowKillApp(QWidget):
         self.result = None
         self.ground_truth = None
 
+        self.apply_styles()
         self.build_ui()
 
-    # =================================================================
-    # BUILD UI
-    # =================================================================
+    def apply_styles(self):
+        self.setStyleSheet("""
+            QWidget {
+                background-color: #1e1e2e;
+                color: #cdd6f4;
+            }
+            QFrame#Sidebar {
+                background-color: #181825;
+                border-right: 1px solid #313244;
+            }
+            QFrame#Card {
+                background-color: #313244;
+                border-radius: 15px;
+                border: 1px solid #45475a;
+            }
+            QLabel#CardTitle {
+                color: #bac2de;
+                font-weight: bold;
+                font-size: 14px;
+                background-color: transparent;
+            }
+            QLabel#ImagePlaceholder {
+                background-color: #1e1e2e;
+                border: 2px dashed #45475a;
+                border-radius: 10px;
+                color: #585b70;
+            }
+            QPushButton {
+                background-color: #45475a;
+                color: #cdd6f4;
+                border: none;
+                padding: 12px 20px;
+                border-radius: 8px;
+                font-weight: bold;
+                text-align: left;
+            }
+            QPushButton:hover {
+                background-color: #585b70;
+                color: #ffffff;
+            }
+            QPushButton#PrimaryBtn {
+                background-color: #89b4fa;
+                color: #1e1e2e;
+            }
+            QPushButton#PrimaryBtn:hover {
+                background-color: #b4befe;
+            }
+            QPushButton#SuccessBtn {
+                background-color: #a6e3a1;
+                color: #1e1e2e;
+            }
+            QPushButton#SuccessBtn:hover {
+                background-color: #94e2d5;
+            }
+            QLabel#Title {
+                font-size: 24px;
+                font-weight: bold;
+                color: #cba6f7;
+                padding: 10px;
+            }
+            QLabel#Status {
+                background-color: #313244;
+                color: #a6adc8;
+                padding: 8px 15px;
+                border-radius: 6px;
+                font-style: italic;
+            }
+        """)
+
     def build_ui(self):
         main_layout = QHBoxLayout(self)
+        main_layout.setSpacing(0)
+        main_layout.setContentsMargins(0, 0, 0, 0)
 
         # ======================================================
         # SIDEBAR
         # ======================================================
         sidebar = QFrame()
-        sidebar.setFixedWidth(250)
-        sidebar.setStyleSheet("""
-            QFrame {
-                background-color: #1f2937;
-                border-right: 2px solid #111827;
-            }
-            QPushButton {
-                background-color: #374151;
-                color: white;
-                border: none;
-                padding: 14px;
-                border-radius: 8px;
-                margin-top: 8px;
-                font-size: 14px;
-            }
-            QPushButton:hover {
-                background-color: #4b5563;
-            }
-        """)
-
+        sidebar.setObjectName("Sidebar")
+        sidebar.setFixedWidth(280)
+        
         sidebar_layout = QVBoxLayout(sidebar)
-        sidebar_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        sidebar_layout.setContentsMargins(20, 30, 20, 30)
+        sidebar_layout.setSpacing(15)
 
         # TITLE
-        title = QLabel("ShadowKill")
-        title.setStyleSheet("color: white; font-size: 22px;")
+        title = QLabel("ShadowKill 🚀")
+        title.setObjectName("Title")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
         sidebar_layout.addWidget(title)
         sidebar_layout.addSpacing(20)
 
-        # Buttons
-        btn_load = QPushButton("Load Shadow Image")
-        btn_load.clicked.connect(self.load_shadow)
+        # BUTTONS
+        self.btn_load = self.create_button("📂  Load Shadow Image", self.load_shadow)
+        self.btn_gt = self.create_button("🎯  Load Ground Truth", self.load_ground_truth)
+        
+        self.btn_process = self.create_button("✨  Run Shadow Removal", self.process_shadow, is_primary=True)
+        
+        self.btn_eval = self.create_button("📊  Evaluate Quality", self.evaluate_psnr_ssim)
+        self.btn_save = self.create_button("Cc  Save Results", self.save_outputs, is_success=True)
 
-        btn_gt = QPushButton("Load Ground Truth")
-        btn_gt.clicked.connect(self.load_ground_truth)
-
-        btn_process = QPushButton("Run Shadow Removal")
-        btn_process.clicked.connect(self.process_shadow)
-
-        btn_eval = QPushButton("Evaluate PSNR & SSIM")
-        btn_eval.clicked.connect(self.evaluate_psnr_ssim)
-
-        btn_save = QPushButton("Save Results")
-        btn_save.clicked.connect(self.save_outputs)
-
-        for btn in [btn_load, btn_gt, btn_process, btn_eval, btn_save]:
-            sidebar_layout.addWidget(btn)
-
+        sidebar_layout.addWidget(self.btn_load)
+        sidebar_layout.addWidget(self.btn_gt)
+        sidebar_layout.addSpacing(10)
+        sidebar_layout.addWidget(self.btn_process)
+        sidebar_layout.addSpacing(10)
+        sidebar_layout.addWidget(self.btn_eval)
+        sidebar_layout.addWidget(self.btn_save)
+        
         sidebar_layout.addStretch()
+        
+        # STATUS BAR
+        self.status = QLabel("Ready to process.")
+        self.status.setObjectName("Status")
+        self.status.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        sidebar_layout.addWidget(self.status)
 
         # ======================================================
-        # PREVIEW AREA (Cards)
+        # MAIN AREA
         # ======================================================
-        preview_area = QFrame()
-        preview_area.setStyleSheet("""
-            QFrame { background-color: #f3f4f6; }
-        """)
-        preview_layout = QVBoxLayout(preview_area)
+        main_area = QWidget()
+        main_layout_area = QVBoxLayout(main_area)
+        main_layout_area.setContentsMargins(30, 30, 30, 30)
+        main_layout_area.setSpacing(20)
 
-        preview_title = QLabel("Image Preview")
-        preview_title.setFont(QFont("Arial", 18))
-        preview_title.setStyleSheet("color: #1f2937; font-weight: bold;")
-        preview_title.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        # Header
+        header_lbl = QLabel("Workspace Preview")
+        header_lbl.setStyleSheet("font-size: 18px; font-weight: bold; color: #a6adc8;")
+        main_layout_area.addWidget(header_lbl)
 
-        preview_layout.addWidget(preview_title)
-        preview_layout.addSpacing(10)
-
-        # GRID
+        # GRID PREVIEW
         grid = QHBoxLayout()
+        grid.setSpacing(20)
 
-        column1 = QVBoxLayout()
-        column2 = QVBoxLayout()
+        col1 = QVBoxLayout()
+        col1.setSpacing(20)
+        col2 = QVBoxLayout()
+        col2.setSpacing(20)
 
-        # Cards
-        self.card_original, self.label_original = self.make_preview_card("Original")
-        self.card_corrected, self.label_corrected = self.make_preview_card("Illumination Corrected")
-        self.card_result, self.label_result = self.make_preview_card("Shadow Removed")
-        self.card_gt, self.label_gt = self.make_preview_card("Ground Truth")
+        self.card_original, self.label_original = self.make_preview_card("Original Input")
+        self.card_result, self.label_result = self.make_preview_card("Shadow Removed (Result)")
+        
+        self.card_corrected, self.label_corrected = self.make_preview_card("Illumination Map")
+        self.card_gt, self.label_gt = self.make_preview_card("Ground Truth (Target)")
 
-        column1.addWidget(self.card_original)
-        column1.addWidget(self.card_result)
+        col1.addWidget(self.card_original)
+        col1.addWidget(self.card_corrected)
+        
+        col2.addWidget(self.card_gt)
+        col2.addWidget(self.card_result)
 
-        column2.addWidget(self.card_corrected)
-        column2.addWidget(self.card_gt)
+        grid.addLayout(col1)
+        grid.addLayout(col2)
+        
+        main_layout_area.addLayout(grid)
 
-        grid.addLayout(column1)
-        grid.addLayout(column2)
-
-        preview_layout.addLayout(grid)
-
-        # STATUS
-        self.status = QLabel("Ready.")
-        self.status.setStyleSheet("""
-            background-color: #e5e7eb;
-            padding: 10px;
-            font-size: 14px;
-            border-radius: 6px;
-            color: #111827;
-        """)
-        preview_layout.addSpacing(15)
-        preview_layout.addWidget(self.status)
-
-        # ADD TO MAIN LAYOUT
+        # ADD TO MAIN
         main_layout.addWidget(sidebar)
-        main_layout.addWidget(preview_area)
+        main_layout.addWidget(main_area)
 
-    # =================================================================
-    # CREATE PREVIEW CARD
-    # =================================================================
+    def create_button(self, text, callback, is_primary=False, is_success=False):
+        btn = QPushButton(text)
+        btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn.clicked.connect(callback)
+        if is_primary:
+            btn.setObjectName("PrimaryBtn")
+        elif is_success:
+            btn.setObjectName("SuccessBtn")
+        return btn
+
     def make_preview_card(self, title):
-        frame = QFrame()
-        frame.setFixedSize(500, 350)
-        frame.setStyleSheet("""
-            QFrame {
-                background-color: white;
-                border-radius: 12px;
-                border: 2px solid #d1d5db;
-            }
-        """)
-
-        layout = QVBoxLayout(frame)
-        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        card = QFrame()
+        card.setObjectName("Card")
+        
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(15, 15, 15, 15)
+        layout.setSpacing(10)
 
         lbl_title = QLabel(title)
-        lbl_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        lbl_title.setStyleSheet("font-size: 16px; color: #374151; margin-bottom: 4px;")
+        lbl_title.setObjectName("CardTitle")
+        lbl_title.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
-        img_label = QLabel()
-        img_label.setFixedSize(450, 280)
+        img_label = QLabel("No Image")
+        img_label.setObjectName("ImagePlaceholder")
         img_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        img_label.setStyleSheet("""
-            QLabel {
-                background-color: #f9fafb;
-                border: 1px dashed #d1d5db;
-                border-radius: 8px;
-            }
-        """)
+        img_label.setScaledContents(False)
+        from PyQt6.QtWidgets import QSizePolicy
+        img_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
         layout.addWidget(lbl_title)
         layout.addWidget(img_label)
 
-        return frame, img_label
+        return card, img_label
 
     # =================================================================
-    # LOAD SHADOW IMAGE
+    # LOGIC (UNCHANGED)
     # =================================================================
     def load_shadow(self):
         path, _ = QFileDialog.getOpenFileName(
@@ -193,9 +236,8 @@ class ShadowKillApp(QWidget):
         if path:
             self.original = cv2.imread(path)
             self.label_original.setPixmap(cv_to_pixmap(self.original))
-            self.status.setText("Shadow image loaded.")
+            self.status.setText("Shadow image loaded successfully.")
 
-    # LOAD GROUND TRUTH
     def load_ground_truth(self):
         path, _ = QFileDialog.getOpenFileName(
             self, "Select Ground Truth", "", "Images (*.png *.jpg *.jpeg *.JPG *.JPEG *.PNG)"
@@ -205,45 +247,54 @@ class ShadowKillApp(QWidget):
             self.label_gt.setPixmap(cv_to_pixmap(self.ground_truth))
             self.status.setText("Ground truth loaded.")
 
-    # =================================================================
-    # RUN SHADOW REMOVAL
-    # =================================================================
     def process_shadow(self):
         if self.original is None:
-            self.status.setText("Error: Load shadow image first.")
+            self.status.setText("⚠️ Please load a shadow image first!")
             return
+        
+        self.status.setText("Processing... Please wait.")
+        QApplication.processEvents() # Force UI update
 
-        orig, corrected, result = shadow_removal(self.original)
+        try:
+            orig, corrected, result = shadow_removal(self.original)
 
-        self.corrected = corrected
-        self.result = result
+            self.corrected = corrected
+            self.result = result
 
-        self.label_corrected.setPixmap(cv_to_pixmap(cv2.cvtColor(corrected, cv2.COLOR_GRAY2BGR)))
-        self.label_result.setPixmap(cv_to_pixmap(cv2.cvtColor(result, cv2.COLOR_GRAY2BGR)))
+            # Handle corrected image (might be grayscale or color)
+            if len(corrected.shape) == 2:
+                self.label_corrected.setPixmap(cv_to_pixmap(cv2.cvtColor(corrected, cv2.COLOR_GRAY2BGR)))
+            else:
+                self.label_corrected.setPixmap(cv_to_pixmap(corrected))
 
-        self.status.setText("Shadow removal completed.")
+            # Handle result image (might be grayscale or color)
+            if len(result.shape) == 2:
+                self.label_result.setPixmap(cv_to_pixmap(cv2.cvtColor(result, cv2.COLOR_GRAY2BGR)))
+            else:
+                self.label_result.setPixmap(cv_to_pixmap(result))
 
-    # =================================================================
-    # EVALUATE PSNR + SSIM
-    # =================================================================
+            self.status.setText("✅ Shadow removal completed!")
+        except Exception as e:
+            self.status.setText(f"❌ Error: {str(e)}")
+            print(e)
+
     def evaluate_psnr_ssim(self):
         if self.ground_truth is None or self.result is None:
-            self.status.setText("Error: Load ground truth & run processing first.")
+            self.status.setText("⚠️ Load GT & Run Process first!")
             return
 
         psnr_val, ssim_val = evaluate_quality(self.ground_truth, self.result)
 
         QMessageBox.information(self, "Evaluation Result",
-                                f"PSNR: {psnr_val:.4f} dB\nSSIM: {ssim_val:.4f}")
+                                f"📊 Evaluation Metrics:\n\n"
+                                f"PSNR: {psnr_val:.4f} dB\n"
+                                f"SSIM: {ssim_val:.4f}")
 
-        self.status.setText("Evaluation completed.")
+        self.status.setText(f"Eval Done: PSNR={psnr_val:.2f}dB, SSIM={ssim_val:.3f}")
 
-    # =================================================================
-    # SAVE OUTPUTS
-    # =================================================================
     def save_outputs(self):
         if self.corrected is None or self.result is None:
-            self.status.setText("Error: Run shadow removal first.")
+            self.status.setText("⚠️ Nothing to save!")
             return
 
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -251,11 +302,10 @@ class ShadowKillApp(QWidget):
         save_image(self.corrected, f"corrected_{timestamp}.png")
         save_image(self.result, f"shadow_removed_{timestamp}.png")
 
-        QMessageBox.information(self, "Saved", "Images saved inside result/ folder.")
-        self.status.setText("Output saved.")
+        QMessageBox.information(self, "Saved", "✅ Images saved inside 'result/' folder.")
+        self.status.setText("Output saved successfully.")
 
 
-# =================================================================
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = ShadowKillApp()
