@@ -34,11 +34,16 @@ class ShadowRemovalEngine:
         self.model.eval()
 
     @torch.no_grad()
-    def run(self, img_path):
+    def run(self, img_input):
         # 1. Load gambar asli
-        img_bgr = cv2.imread(img_path, cv2.IMREAD_COLOR)
-        if img_bgr is None:
-            raise FileNotFoundError(f"Cannot read image: {img_path}")
+        if isinstance(img_input, str):
+            img_bgr = cv2.imread(img_input, cv2.IMREAD_COLOR)
+            if img_bgr is None:
+                raise FileNotFoundError(f"Cannot read image: {img_input}")
+        elif isinstance(img_input, np.ndarray):
+            img_bgr = img_input
+        else:
+            raise ValueError("Input must be a file path (str) or numpy array")
 
         orig_h, orig_w = img_bgr.shape[:2]
         img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
@@ -59,8 +64,13 @@ class ShadowRemovalEngine:
 
         # 5. Resize output balik ke resolusi asli
         out_full = cv2.resize(out, (orig_w, orig_h), interpolation=cv2.INTER_CUBIC)
+        
+        # Return RGB (karena main.py expect RGB/BGR handling, tapi processing.py return BGR/HSV converted)
+        # processing.py return: image, corrected_gray, result_color (BGR)
+        # Kita return BGR agar konsisten
+        out_full_bgr = cv2.cvtColor(out_full, cv2.COLOR_RGB2BGR)
 
-        return out_full
+        return out_full_bgr
 
 
 # ==========================================
@@ -74,7 +84,7 @@ class MainWindow(QWidget):
 
         # Load model (cek path checkpoint-nya!)
         self.engine = ShadowRemovalEngine(
-            checkpoint_path="./checkpoints/bedsrnet_jung_best.pth",
+            checkpoint_path="./best_model/bedsrnet_jung_best.pth",
             img_size=2048,
             device="cuda" if torch.cuda.is_available() else "cpu"
         )
