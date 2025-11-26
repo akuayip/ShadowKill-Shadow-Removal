@@ -10,7 +10,7 @@ from PyQt6.QtGui import QPixmap, QImage
 from PyQt6.QtCore import Qt
 
 
-from bedsrmodel import BEDSRNet
+from bedsrmodel2 import BEDSRNet
 
 # ==========================================
 # Helper: numpy RGB -> QPixmap
@@ -52,25 +52,24 @@ class ShadowRemovalEngine:
         img_resized = cv2.resize(img_rgb, (self.img_size, self.img_size),
                                  interpolation=cv2.INTER_AREA)
 
-        inp = img_resized.astype(np.float32) / 255.0
+        inp = img_resized.astype(np.float32) / 255.0      # [0,1]
+        inp = inp * 2.0 - 1.0                             # [-1,1]
         inp = torch.from_numpy(inp).permute(2, 0, 1).unsqueeze(0).to(self.device)
 
         # 3. Forward ke model
         pred, bg, att = self.model(inp)
 
         # 4. Balik ke numpy RGB 0–255
-        out = pred[0].permute(1, 2, 0).cpu().numpy()
-        out = (out * 255.0).clip(0, 255).astype(np.uint8)
+        out = pred[0].permute(1, 2, 0).cpu().numpy()      # [-1,1]
+        out = (out + 1.0) / 2.0                           # [0,1]
+        out = (out * 255.0).clip(0, 255).astype(np.uint8) # [0,255] uint8
 
         # 5. Resize output balik ke resolusi asli
         out_full = cv2.resize(out, (orig_w, orig_h), interpolation=cv2.INTER_CUBIC)
         
-        # Return RGB (karena main.py expect RGB/BGR handling, tapi processing.py return BGR/HSV converted)
-        # processing.py return: image, corrected_gray, result_color (BGR)
-        # Kita return BGR agar konsisten
-        out_full_bgr = cv2.cvtColor(out_full, cv2.COLOR_RGB2BGR)
+        # Return RGB
+        return out_full
 
-        return out_full_bgr
 
 
 # ==========================================
