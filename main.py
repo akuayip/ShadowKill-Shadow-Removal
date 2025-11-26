@@ -1,9 +1,11 @@
 import sys
 import cv2
 import datetime
+import torch
+import numpy as np
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout,
-    QFileDialog, QMessageBox, QFrame
+    QFileDialog, QMessageBox, QFrame, QComboBox, QSizePolicy
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
@@ -11,7 +13,7 @@ from PyQt6.QtGui import QFont
 from processing import shadow_removal
 from evaluation import evaluate_quality
 from utils import cv_to_pixmap, save_image, ensure_result_folder
-
+from inferenceDL import ShadowRemovalEngine
 
 class ShadowKillApp(QWidget):
     def __init__(self):
@@ -28,6 +30,17 @@ class ShadowKillApp(QWidget):
         self.corrected = None
         self.result = None
         self.ground_truth = None
+        
+        # Initialize DL Engine
+        self.dl_engine = None
+        try:
+            # Path model hardcoded ke best_model/bedsrnet_jung_best.pth
+            model_path = "./best_model/bedsrnet_jung_best.pth"
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            self.dl_engine = ShadowRemovalEngine(model_path, img_size=1024, device=device)
+            print(f"DL Engine loaded on {device}")
+        except Exception as e:
+            print(f"Failed to load DL Engine: {e}")
 
         self.apply_styles()
         self.build_ui()
@@ -86,6 +99,17 @@ class ShadowKillApp(QWidget):
             QPushButton#SuccessBtn:hover {
                 background-color: #94e2d5;
             }
+            QComboBox {
+                background-color: #313244;
+                color: #cdd6f4;
+                border: 1px solid #45475a;
+                border-radius: 8px;
+                padding: 10px;
+                font-size: 14px;
+            }
+            QComboBox::drop-down {
+                border: none;
+            }
             QLabel#Title {
                 font-size: 24px;
                 font-weight: bold;
@@ -123,6 +147,19 @@ class ShadowKillApp(QWidget):
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         sidebar_layout.addWidget(title)
         sidebar_layout.addSpacing(20)
+        
+        # METHOD SELECTOR
+        lbl_method = QLabel("Select Method:")
+        lbl_method.setStyleSheet("color: #a6adc8; font-size: 12px; font-weight: bold;")
+        sidebar_layout.addWidget(lbl_method)
+        
+        self.combo_method = QComboBox()
+        self.combo_method.addItems([
+            "Conventional (Enhanced)",
+            "Deep Learning (BEDSR-Net)"
+        ])
+        sidebar_layout.addWidget(self.combo_method)
+        sidebar_layout.addSpacing(10)
 
         # BUTTONS
         self.btn_load = self.create_button("📂  Load Shadow Image", self.load_shadow)
@@ -174,14 +211,14 @@ class ShadowKillApp(QWidget):
         self.card_original, self.label_original = self.make_preview_card("Original Input")
         self.card_result, self.label_result = self.make_preview_card("Shadow Removed (Result)")
         
-        self.card_corrected, self.label_corrected = self.make_preview_card("Illumination Map")
-        self.card_gt, self.label_gt = self.make_preview_card("Ground Truth (Target)")
+        self.card_gt, self.label_gt = self.make_preview_card("Ground Truth (Target)")        
+        self.card_corrected, self.label_corrected = self.make_preview_card("Illumination Map / DL Output")
 
         col1.addWidget(self.card_original)
-        col1.addWidget(self.card_corrected)
-        
+        col1.addWidget(self.card_result)
+
         col2.addWidget(self.card_gt)
-        col2.addWidget(self.card_result)
+        col2.addWidget(self.card_corrected)
 
         grid.addLayout(col1)
         grid.addLayout(col2)
@@ -218,7 +255,6 @@ class ShadowKillApp(QWidget):
         img_label.setObjectName("ImagePlaceholder")
         img_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         img_label.setScaledContents(False)
-        from PyQt6.QtWidgets import QSizePolicy
         img_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
         layout.addWidget(lbl_title)
@@ -227,7 +263,7 @@ class ShadowKillApp(QWidget):
         return card, img_label
 
     # =================================================================
-    # LOGIC (UNCHANGED)
+    # LOGIC
     # =================================================================
     def load_shadow(self):
         path, _ = QFileDialog.getOpenFileName(
@@ -252,28 +288,43 @@ class ShadowKillApp(QWidget):
             self.status.setText("⚠️ Please load a shadow image first!")
             return
         
-        self.status.setText("Processing... Please wait.")
+        method = self.combo_method.currentText()
+        self.status.setText(f"Processing with {method}... Please wait.")
         QApplication.processEvents() # Force UI update
 
         try:
-            orig, corrected, result = shadow_removal(self.original)
-
-            self.corrected = corrected
-            self.result = result
-
-            # Handle corrected image (might be grayscale or color)
-            if len(corrected.shape) == 2:
-                self.label_corrected.setPixmap(cv_to_pixmap(cv2.cvtColor(corrected, cv2.COLOR_GRAY2BGR)))
+            if "Deep Learning" in method:
+                if self.dl_engine is None:
+                    raise Exception("DL Engine not loaded! Check model path.")
+                
+                # DL Process
+                # DL Engine returns BGR image directly
+                result_bgr = self.dl_engine.run(self.original)
+                
+                self.corrected = result_bgr # DL doesn't have intermediate 'corrected', just use result
+                self.result = result_bgr
+                
             else:
-                self.label_corrected.setPixmap(cv_to_pixmap(corrected))
+                # Conventional Process
+                orig, corrected, result = shadow_removal(self.original)
+                self.corrected = corrected
+                self.result = result
 
-            # Handle result image (might be grayscale or color)
-            if len(result.shape) == 2:
-                self.label_result.setPixmap(cv_to_pixmap(cv2.cvtColor(result, cv2.COLOR_GRAY2BGR)))
+            # Update UI
+            # Handle corrected image
+            if len(self.corrected.shape) == 2:
+                self.label_corrected.setPixmap(cv_to_pixmap(cv2.cvtColor(self.corrected, cv2.COLOR_GRAY2BGR)))
             else:
-                self.label_result.setPixmap(cv_to_pixmap(result))
+                self.label_corrected.setPixmap(cv_to_pixmap(self.corrected))
+
+            # Handle result image
+            if len(self.result.shape) == 2:
+                self.label_result.setPixmap(cv_to_pixmap(cv2.cvtColor(self.result, cv2.COLOR_GRAY2BGR)))
+            else:
+                self.label_result.setPixmap(cv_to_pixmap(self.result))
 
             self.status.setText("✅ Shadow removal completed!")
+            
         except Exception as e:
             self.status.setText(f"❌ Error: {str(e)}")
             print(e)
