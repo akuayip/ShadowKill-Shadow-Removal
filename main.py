@@ -35,7 +35,7 @@ class ShadowKillApp(QWidget):
         self.dl_engine = None
         try:
             # Path model hardcoded ke best_model/bedsrnet_jung_best.pth
-            model_path = "./best_model/bedsrnet_jung_best.pth"
+            model_path = "./best_model/training3/best_model.pth"
             device = "cuda" if torch.cuda.is_available() else "cpu"
             self.dl_engine = ShadowRemovalEngine(model_path, img_size=1024, device=device)
             print(f"DL Engine loaded on {device}")

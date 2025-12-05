@@ -10,7 +10,7 @@ from PyQt6.QtGui import QPixmap, QImage
 from PyQt6.QtCore import Qt
 
 
-from bedsrmodel import BEDSRNet
+from bedsrmodel2 import BEDSRNet
 
 # ==========================================
 # Helper: numpy RGB -> QPixmap
@@ -83,7 +83,7 @@ class MainWindow(QWidget):
 
         # Load model (cek path checkpoint-nya!)
         self.engine = ShadowRemovalEngine(
-            checkpoint_path="./best_model/bedsrnet_jung_best.pth",
+            checkpoint_path="best_model\training3\best_model.pth",
             img_size=2048,
             device="cuda" if torch.cuda.is_available() else "cpu"
         )

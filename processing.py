@@ -14,9 +14,7 @@ def shadow_removal(image):
     kernel_size = int(min(h_img, w_img) * 0.03) 
     if kernel_size % 2 == 0:
         kernel_size += 1
-    # Minimal kernel size 15 agar tidak terlalu kecil
-    kernel_size = max(15, kernel_size)
-    
+    kernel_size = max(15, kernel_size)    
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (kernel_size, kernel_size))
     
     # Morphological Close untuk mendapatkan estimasi background
