@@ -10,7 +10,7 @@ from PyQt6.QtGui import QPixmap, QImage
 from PyQt6.QtCore import Qt
 
 
-from bedsrmodel2 import BEDSRNet
+from bedsrmodel import BEDSRNet
 
 # ==========================================
 # Helper: numpy RGB -> QPixmap

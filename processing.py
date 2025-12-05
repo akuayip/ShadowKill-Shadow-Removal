@@ -40,7 +40,7 @@ def shadow_removal(image):
     
     corrected_gray = enhanced_v
     
-    # 7. Binarization (Opsional, untuk output hitam putih tegas)
+    # 7. Binarization 
     binary_result = cv2.adaptiveThreshold(
         enhanced_v,
         255,

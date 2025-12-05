@@ -203,25 +203,15 @@ class ShadowKillApp(QWidget):
         grid = QHBoxLayout()
         grid.setSpacing(20)
 
-        col1 = QVBoxLayout()
-        col1.setSpacing(20)
-        col2 = QVBoxLayout()
-        col2.setSpacing(20)
-
         self.card_original, self.label_original = self.make_preview_card("Original Input")
+        self.card_gt, self.label_gt = self.make_preview_card("Ground Truth (Target)")        
         self.card_result, self.label_result = self.make_preview_card("Shadow Removed (Result)")
         
-        self.card_gt, self.label_gt = self.make_preview_card("Ground Truth (Target)")        
-        self.card_corrected, self.label_corrected = self.make_preview_card("Illumination Map / DL Output")
+        # Note: self.card_corrected is removed from UI but we keep self.corrected data for saving
 
-        col1.addWidget(self.card_original)
-        col1.addWidget(self.card_result)
-
-        col2.addWidget(self.card_gt)
-        col2.addWidget(self.card_corrected)
-
-        grid.addLayout(col1)
-        grid.addLayout(col2)
+        grid.addWidget(self.card_original)
+        grid.addWidget(self.card_gt)
+        grid.addWidget(self.card_result)
         
         main_layout_area.addLayout(grid)
 
@@ -311,11 +301,11 @@ class ShadowKillApp(QWidget):
                 self.result = result
 
             # Update UI
-            # Handle corrected image
-            if len(self.corrected.shape) == 2:
-                self.label_corrected.setPixmap(cv_to_pixmap(cv2.cvtColor(self.corrected, cv2.COLOR_GRAY2BGR)))
-            else:
-                self.label_corrected.setPixmap(cv_to_pixmap(self.corrected))
+            # We no longer show self.corrected in the UI, but we keep it for saving.
+            # if len(self.corrected.shape) == 2:
+            #     self.label_corrected.setPixmap(cv_to_pixmap(cv2.cvtColor(self.corrected, cv2.COLOR_GRAY2BGR)))
+            # else:
+            #     self.label_corrected.setPixmap(cv_to_pixmap(self.corrected))
 
             # Handle result image
             if len(self.result.shape) == 2:
